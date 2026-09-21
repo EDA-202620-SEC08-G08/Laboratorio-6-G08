@@ -51,3 +51,32 @@ def find_slot(my_map, key, hash_value):
             ocupied = True
       hash_value = (hash_value + 1) % my_map["capacity"]
    return ocupied, first_avail
+
+def put(my_map, key, value):
+    hash_value = mf.hash_value(my_map, key)
+    ocupied, pos = find_slot(my_map, key, hash_value)
+    entry = al.get_element(my_map["table"], pos)
+
+    if ocupied:
+        me.set_value(entry, value)
+    else:
+        me.set_key(entry, key)
+        me.set_value(entry, value)
+        my_map["size"] += 1
+        my_map["current_factor"] = my_map["size"] / my_map["capacity"]
+        if my_map["current_factor"] > my_map["limit_factor"]:
+            rehash(my_map)
+    return my_map
+
+def rehash(my_map):
+    new_table=new_map(2 * (my_map["capacity"]),1,my_map["prime"])
+    new_table["limit_factor"] = my_map["limit_factor"]
+    
+    old=my_map["table"]
+    for i in range(al.size(old)):
+        entry=al.get_element(old,i)
+        k = me.get_key(entry)
+        if k is not None and k != "__EMPTY__":
+            put(new_table, k, me.get_value(entry))
+    my_map.update(new_table)
+    return my_map
