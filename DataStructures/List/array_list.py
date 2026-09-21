@@ -1,3 +1,5 @@
+from DataStructures.List import array_list as al
+
 def new_list():
     new_list ={
     "elements": [],
