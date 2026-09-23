@@ -80,3 +80,52 @@ def rehash(my_map):
             put(new_table, k, me.get_value(entry))
     my_map.update(new_table)
     return my_map
+
+def contains(my_map, key):
+    hash_value = mf.hash_value(my_map, key)
+    ocupied, pos = find_slot(my_map, key, hash_value)
+    return ocupied
+
+def get(my_map, key):
+    hash_value = mf.hash_value(my_map, key)
+    ocupied, pos = find_slot(my_map, key, hash_value)
+    if ocupied:
+        entry = al.get_element(my_map["table"], pos)
+        return me.get_value(entry)
+    return None
+
+def remove(my_map, key):
+    hash_value = mf.hash_value(my_map, key)
+    ocupied, pos = find_slot(my_map, key, hash_value)
+    if ocupied:
+        entry = al.get_element(my_map["table"], pos)
+        me.set_key(entry, "__EMPTY__")
+        my_map["size"] -= 1
+        my_map["current_factor"] = my_map["size"] / my_map["capacity"]
+        return me.get_value(entry)
+
+def size(my_map):
+    return my_map["size"]
+
+def is_empty(my_map):
+    if my_map["size"] == 0:
+        return True
+    return False
+
+def key_set(my_map):
+    keys = al.new_list()
+    for i in range(al.size(my_map["table"])):
+        entry = al.get_element(my_map["table"], i)
+        k = me.get_key(entry)
+        if k is not None and k != "__EMPTY__":
+            al.add_last(keys, k)
+    return keys
+
+def value_set(my_map):
+    values = al.new_list()
+    for i in range(al.size(my_map["table"])):
+        entry = al.get_element(my_map["table"], i)
+        k = me.get_key(entry)
+        if k is not None and k != "__EMPTY__":
+            al.add_last(values, me.get_value(entry))
+    return values
