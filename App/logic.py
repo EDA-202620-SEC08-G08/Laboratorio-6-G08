@@ -34,20 +34,13 @@ from DataStructures.Map import map_separate_chaining as sp
 
 
 data_dir = os.path.dirname(os.path.realpath('__file__')) + '/Data/GoodReads/'
-map_algorithm = None
 
-def new_logic(user_map_algorithm, num_elements, load_factor, prime=109345121):
+def new_logic():
     """
     Inicializa el catálogo de libros. Crea una lista vacía para guardar
     los libros y utiliza tablas de hash para almacenar los datos restantes con diferentes índices
     utilizando linear probing como tipo de tabla de hash
     """
-    
-    global map_algorithm
-    if user_map_algorithm == "1":
-        map_algorithm = lp
-    else:
-        map_algorithm = sp
     
     catalog = {"books": None,
                "books_by_id": None,
@@ -61,20 +54,24 @@ def new_logic(user_map_algorithm, num_elements, load_factor, prime=109345121):
 
     #Tabla de Hash que contiene los libros indexados por good_reads_book_id  
     #(good_read_id -> book)
-    catalog['books_by_id'] = map_algorithm.new_map(1000,0.7)
+    catalog['books_by_id'] = lp.new_map(1000, 0.7)
 
     #Tabla de Hash con la siguiente pareja llave valor: (author_name -> List(books))
-    catalog['books_by_authors'] = map_algorithm.new_map(1000,0.7)
+    catalog['books_by_authors'] =  lp.new_map(1000, 0.7)
+
 
     #Tabla de Hash con la siguiente pareja llave valor: (tag_name -> tag)
-    catalog['tags'] = map_algorithm.new_map(1000,0.7)
+    catalog['tags'] =  lp.new_map(1000, 0.7)
+
 
     #Tabla de Hash con la siguiente pareja llave valor: (tag_id -> book_tags)
-    catalog['book_tags'] = map_algorithm.new_map(1000,0.7)
+    catalog['book_tags'] =  lp.new_map(1000, 0.7)
+
 
     #Tabla de Hash principal que contiene sub-mapas dentro de los valores
     #con la siguiente representación de la pareja llave valor: (author_name -> (original_publication_year -> list(books)))
-    catalog['books_by_year_author'] = map_algorithm.new_map(1000,0.7)
+    catalog['books_by_year_author'] =  lp.new_map(1000, 0.7)
+
     
     return catalog
 
@@ -88,10 +85,23 @@ def load_data(catalog):
     Carga los datos de los archivos y cargar los datos en la
     estructura de datos
     """
+    start_time = getTime()
+    
+    tracemalloc.start()
+    start_memory = getMemory()
+    
     books, authors = load_books(catalog)
     tag_size = load_tags(catalog)
     book_tag_size = load_books_tags(catalog)
-    return books, authors,tag_size,book_tag_size
+    
+    stop_memory = getMemory()
+    end_time = getTime()
+    
+    tiempo_transcurrido= deltaTime(end_time, start_time)
+    memoria_usada= deltaMemory(start_memory, stop_memory)
+
+    
+    return books, authors,tag_size,book_tag_size, tiempo_transcurrido, memoria_usada
 
 
 def load_books(catalog):
@@ -159,7 +169,7 @@ def add_book(catalog, book):
     # Se adiciona el libro a la lista general de libros
     al.add_last(catalog['books'], book)
     # Se adiciona el libro a la tabla de hash indexada por goodreads_book_id
-    map_algorithm.put(catalog['books_by_id'],book['goodreads_book_id'], book)
+    lp.put(catalog['books_by_id'],book['goodreads_book_id'], book)
     # Se obtienen los autores del libro
     authors = book['authors'].split(",")
     # Para cada autor, se agrega en la tabla de hash indexada por autores y 
@@ -176,7 +186,7 @@ def add_book_author(catalog, author_name, book):
     a los libros de dicho autor
     """
     authors = catalog['books_by_authors']
-    author_value = map_algorithm.get(authors,author_name)
+    author_value = lp.get(authors,author_name)
     if author_value:
         #Si el autor ya se había agregado al mapa, se obtiene la lista que contiene sus libros y se agrega el nuevo elemento.
         al.add_last(author_value,book)
@@ -185,7 +195,7 @@ def add_book_author(catalog, author_name, book):
         # y como valor una lista que contiene los libros asociados al autor.
         authors_books = al.new_list()
         al.add_last(authors_books,book)
-        map_algorithm.put(authors,author_name,authors_books)
+        lp.put(authors,author_name,authors_books)
     return catalog
 
 
@@ -206,22 +216,23 @@ def add_book_author_and_year(catalog, author_name, book):
     if not pub_year or str(pub_year).strip() == "":
         pub_year = "Desconocido"
         
-    author_value = map_algorithm.get(books_by_year_author,author_name)
+    author_value = lp.get(books_by_year_author,author_name)
     if author_value:
-        pub_year_value = map_algorithm.get(author_value,pub_year)
+        pub_year_value = lp.get(author_value,pub_year)
         if pub_year_value:
             al.add_last(pub_year_value,book)
         else:
             books = al.new_list()
             al.add_last(books, book)
-            pub_year_map = map_algorithm.new_map(1000,0.7)
-            map_algorithm.put(pub_year_map,pub_year,books)
+            lp.put(author_value, pub_year, books)
     else:
+        pub_year_map = lp.new_map(1000, 0.7)
+        
         books = al.new_list()
         al.add_last(books, book)
-        pub_year_map = map_algorithm.new_map(1000, 0.7)
-        map_algorithm.put(pub_year_map, pub_year, books)
-        map_algorithm.put(books_by_year_author, author_name, pub_year_map)
+        
+        lp.put(pub_year_map, pub_year, books)
+        lp.put(books_by_year_author, author_name, pub_year_map)
     return catalog
 
 
@@ -230,7 +241,7 @@ def add_tag(catalog, tag):
     Adiciona un tag al mapa de tags indexado por nombre del tag
     """
     t = new_tag(tag['tag_name'], tag['tag_id'])
-    map_algorithm.put(catalog['tags'],tag['tag_name'],t)
+    lp.put(catalog['tags'],tag['tag_name'],t)
     return catalog
 
 
@@ -243,14 +254,14 @@ def add_book_tag(catalog, book_tag):
         - Se crea el nuevo indice en el mapa y como valor se agrega una nueva lista con el book_tag asociado.
     """
     t = new_book_tag(book_tag['tag_id'], book_tag['goodreads_book_id'], book_tag['count'])
-    book_tag_value = map_algorithm.contains(catalog['book_tags'],t['tag_id'])
+    book_tag_value = lp.contains(catalog['book_tags'],t['tag_id'])
     if book_tag_value:
-        book_tag_list = map_algorithm.get(catalog['book_tags'],t['tag_id'])
-        al.add_last(book_tag_list,book_tag)
+        book_tag_list = lp.get(catalog['book_tags'],t['tag_id'])
+        al.add_last(book_tag_list, t)
     else:
         book_tag_list = al.new_list()
         al.add_last(book_tag_list, t)
-        map_algorithm.put(catalog['book_tags'], t['tag_id'], book_tag_list)   
+        lp.put(catalog['book_tags'], t['tag_id'], book_tag_list)   
     return catalog
 
 #  -------------------------------------------------------------
@@ -262,7 +273,7 @@ def get_book_info_by_book_id(catalog, good_reads_book_id):
     Retorna toda la informacion que se tenga almacenada de un libro según su good_reads_id.
     """
     books_map = catalog['books_by_id']
-    book = map_algorithm.get(books_map, good_reads_book_id)
+    book = lp.get(books_map, good_reads_book_id)
     return book
 
 
@@ -271,8 +282,9 @@ def get_books_by_author(catalog, author_name):
     Retorna los libros asociado al autor ingresado por párametro
     """
     authors_map = catalog['books_by_authors']
-    books_list = map_algorithm.get(authors_map, author_name)
-    return books_list
+    books_list = lp.get(authors_map, author_name)
+
+    return author_name, books_list
 
 
 def get_books_by_tag(catalog, tag_name):
@@ -285,30 +297,38 @@ def get_books_by_tag(catalog, tag_name):
     de book_tags y finalmente relacionarlo con los datos completos del libro.
 
     """
-    tags_map = catalog['tags']
-    tag_info = map_algorithm.get(tags_map, tag_name)
-    
-    if not tag_info:
+    tag = lp.get(catalog['tags'], tag_name)
+
+    if tag is None:
         return None
-    
-    tag_id = tag_info['tag_id']
-    book_tags_map = catalog['book_tags']
-    book_tags_list = map_algorithm.get(book_tags_map, tag_id)
-    
-    if not book_tags_list:
+
+    tag_id = tag['tag_id']
+
+    book_tags = lp.get(
+        catalog['book_tags'],
+        tag_id
+    )
+
+    if book_tags is None:
         return None
-    
-    result_books = al.new_list()
-    books_map = catalog['books_by_id']
-    list_size = al.size(book_tags_list)
-    for i in range(list_size):
-        book_tag_entry = al.get_element(book_tags_list, i)
-        book_id = book_tag_entry['book_id']
-        book = map_algorithm.get(books_map, book_id)
-        if book:
-            al.add_last(result_books, book)
-            
-    return result_books
+
+    books = al.new_list()
+
+    for i in range(al.size(book_tags)):
+
+        book_tag = al.get_element(book_tags, i)
+
+        book_id = book_tag['book_id']
+
+        book = lp.get(
+            catalog['books_by_id'],
+            book_id
+        )
+
+        if book is not None:
+            al.add_last(books, book)
+
+    return books
 
 
 def get_books_by_author_pub_year(catalog, author_name, pub_year):
@@ -325,14 +345,14 @@ def get_books_by_author_pub_year(catalog, author_name, pub_year):
     start_memory = getMemory()
     
     if not pub_year or str(pub_year).strip() == "":
-        pub_year = "0"
+        pub_year = "Desconocido"
         
     resultado = None
     
     books_by_year_author = catalog['books_by_year_author']
-    author_map = map_algorithm.get(books_by_year_author, author_name)
+    author_map = lp.get(books_by_year_author, author_name)
     if author_map:
-        books_list = map_algorithm.get(author_map, str(pub_year))
+        books_list = lp.get(author_map, str(pub_year))
         if books_list:
             resultado = books_list
     
@@ -352,19 +372,19 @@ def get_books_by_author_pub_year(catalog, author_name, pub_year):
 #  -------------------------------------------------------------
 
 def book_size(catalog):
-    return map_algorithm.size(catalog['books_by_id'])
+    return lp.size(catalog['books_by_id'])
 
 
 def author_size(catalog):
-    return map_algorithm.size(catalog['books_by_authors'])
+    return lp.size(catalog['books_by_authors'])
 
 
 def tag_size(catalog):
-    return map_algorithm.size(catalog['tags'])
+    return lp.size(catalog['tags'])
 
 
 def book_tag_size(catalog):
-    return map_algorithm.size(catalog['book_tags'])
+    return lp.size(catalog['book_tags'])
 
 #  -------------------------------------------------------------
 # Funciones utilizadas para obtener memoria y tiempo
